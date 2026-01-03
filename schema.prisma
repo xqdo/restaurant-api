@@ -1,0 +1,335 @@
+// Restaurant Management System - Prisma Schema
+// Converted from public/database.sql
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============= ENUMS =============
+
+enum StatusEnum {
+  pending
+  preparing
+  ready
+  done
+
+  @@map("status_t")
+}
+
+enum DiscountTypeEnum {
+  amount
+  percentage
+  combo
+
+  @@map("type_t")
+}
+
+enum ConditionTypeEnum {
+  min_amount
+  day_of_week
+
+  @@map("condition_type_t")
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+}
+
+// ============= BASE ENTITY (Audit Trail) =============
+
+model BaseEntity {
+  id          Int       @id @default(autoincrement())
+  created_at  DateTime  @db.Timestamp()
+  created_by  Int?
+  updated_at  DateTime? @map("upadated_at") @db.Timestamp() // Keep typo from SQL schema
+  updated_by  Int?
+  deleted_at  DateTime? @db.Timestamp()
+  deleted_by  Int?
+  isdeleted   Boolean   @default(false)
+
+  // Relations to User (circular - handle carefully)
+  createdByUser User? @relation("CreatedBy", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  updatedByUser User? @relation("UpdatedBy", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  deletedByUser User? @relation("DeletedBy", fields: [deleted_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Entities using this base
+  users           User[]           @relation("UserBaseEntity")
+  items           Item[]
+  sections        Section[]
+  receipts        Receipt[]
+  receiptItems    ReceiptItem[]
+  deliveryGuys    DeliveryGuy[]
+  discounts       Discount[]
+  discountItems   DiscountItem[]
+  discountConditions DiscountCondition[]
+  tables          Table[]
+
+  @@map("base_entity")
+}
+
+// ============= USER MANAGEMENT =============
+
+model Role {
+  id        Int        @id @default(autoincrement())
+  name      String     @db.VarChar(255)
+  userRoles UserRole[]
+
+  @@map("roles")
+}
+
+model User {
+  id             Int    @id @default(autoincrement())
+  fullname       String @db.VarChar(255)
+  username       String @db.VarChar(255)
+  password       String @db.VarChar(255)
+  is_active      Boolean @default(true)
+  base_entity_id Int
+
+  // Relations
+  baseEntity BaseEntity @relation("UserBaseEntity", fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userRoles  UserRole[]
+  logs       Log[]
+
+  // Base entity audit relations
+  createdEntities BaseEntity[] @relation("CreatedBy")
+  updatedEntities BaseEntity[] @relation("UpdatedBy")
+  deletedEntities BaseEntity[] @relation("DeletedBy")
+
+  @@map("users")
+}
+
+model UserRole {
+  id      Int @id @default(autoincrement())
+  user_id Int
+  role_id Int
+
+  // Relations
+  user User @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  role Role @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("user_roles")
+}
+
+// ============= TABLES =============
+
+model Table {
+  id             Int          @id @default(autoincrement())
+  number         Int          @unique
+  status         TableStatus  @default(AVAILABLE)
+  base_entity_id Int
+
+  // Relations
+  baseEntity BaseEntity @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  receipts   Receipt[]
+
+  @@map("tables")
+}
+
+// ============= ITEMS & SECTIONS =============
+
+model Image {
+  id    Int    @id @default(autoincrement())
+  path  String @db.VarChar(255)
+  items Item[]
+
+  @@map("images")
+}
+
+model Section {
+  id             Int    @id @default(autoincrement())
+  name           String @db.VarChar(255)
+  base_entity_id Int
+
+  // Relations
+  baseEntity BaseEntity @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  items      Item[]
+
+  @@map("sections")
+}
+
+model Item {
+  id             Int     @id @default(autoincrement())
+  name           String  @db.VarChar(255)
+  section_id     Int
+  price          Decimal @db.Decimal
+  image_id       Int?
+  description    String? @db.Text
+  base_entity_id Int
+
+  // Relations
+  section        Section         @relation(fields: [section_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  image          Image?          @relation(fields: [image_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  baseEntity     BaseEntity      @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  receiptItems   ReceiptItem[]
+  discountItems  DiscountItem[]
+
+  @@map("items")
+}
+
+// ============= RECEIPTS (ORDERS) =============
+
+model Receipt {
+  id             Int      @id @default(autoincrement())
+  number         Int
+  is_delivery    Boolean  @default(false)
+  phone_number   String?  @db.VarChar(255)
+  location       String?  @db.VarChar(255)
+  notes          String?  @db.Text
+  table_id       Int?
+  base_entity_id Int
+
+  // Relations
+  baseEntity        BaseEntity          @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  table             Table?              @relation(fields: [table_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  receiptItems      ReceiptItem[]
+  deliveryReceipts  DeliveryReceipt[]
+  receiptDiscounts  ReceiptDiscount[]
+
+  @@map("receipt")
+}
+
+model ReceiptItem {
+  id             Int        @id @default(autoincrement())
+  receipt_id     Int
+  item_id        Int
+  quantity       Decimal    @db.Decimal
+  status         StatusEnum @default(pending)
+  notes          String?    @db.Text
+  base_entity_id Int
+
+  // Relations
+  receipt               Receipt                @relation(fields: [receipt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  item                  Item                   @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  baseEntity            BaseEntity             @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  receiptItemDiscounts  ReceiptItemDiscount[]
+
+  @@map("receipt_items")
+}
+
+// ============= DELIVERY =============
+
+model DeliveryGuy {
+  id             Int    @id @default(autoincrement())
+  name           String @db.VarChar(255)
+  phone_number   String @db.VarChar(255)
+  base_entity_id Int
+
+  // Relations
+  baseEntity       BaseEntity        @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  deliveryReceipts DeliveryReceipt[]
+
+  @@map("delivery_guys")
+}
+
+model DeliveryReceipt {
+  id              Int     @id @default(autoincrement())
+  dilvery_guy_id  Int     @map("dilvery_guy_id") // Keep typo from SQL schema
+  is_paid         Boolean @default(false)
+  receipt_id      Int
+
+  // Relations
+  deliveryGuy DeliveryGuy @relation(fields: [dilvery_guy_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  receipt     Receipt     @relation(fields: [receipt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("delivery_receipts")
+}
+
+// ============= DISCOUNTS =============
+
+model Discount {
+  id             Int               @id @default(autoincrement())
+  name           String            @db.VarChar(255)
+  code           String            @unique @db.VarChar(255)
+  type           DiscountTypeEnum
+  max_receipts   Int?
+  amount         Decimal?          @db.Decimal
+  persentage     Decimal?          @db.Decimal @map("persentage") // Keep typo from SQL schema
+  start_date     DateTime          @db.Timestamp()
+  end_date       DateTime          @db.Timestamp()
+  is_active      Boolean           @default(true)
+  base_entity_id Int
+
+  // Relations
+  baseEntity            BaseEntity            @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  discountItems         DiscountItem[]
+  discountConditions    DiscountCondition[]
+  receiptDiscounts      ReceiptDiscount[]
+  receiptItemDiscounts  ReceiptItemDiscount[]
+
+  @@map("discounts")
+}
+
+model DiscountItem {
+  id             Int     @id @default(autoincrement())
+  item_id        Int
+  discount_id    Int
+  min_quantity   Decimal @default(1) @db.Decimal
+  base_entity_id Int
+
+  // Relations
+  item       Item       @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  discount   Discount   @relation(fields: [discount_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  baseEntity BaseEntity @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("discount_items")
+}
+
+model DiscountCondition {
+  id             Int               @id @default(autoincrement())
+  discount_id    Int
+  condition_type ConditionTypeEnum
+  value          String            @db.VarChar(255)
+  base_entity_id Int
+
+  // Relations
+  discount   Discount   @relation(fields: [discount_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  baseEntity BaseEntity @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("discount_conditions")
+}
+
+model ReceiptDiscount {
+  id          Int @id @default(autoincrement())
+  receipt_id  Int
+  discount_id Int
+
+  // Relations
+  receipt  Receipt  @relation(fields: [receipt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  discount Discount @relation(fields: [discount_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("receipt_discounts")
+}
+
+model ReceiptItemDiscount {
+  id              Int     @id @default(autoincrement())
+  receipt_item_id Int
+  discount_id     Int
+  applied_amount  Decimal @db.Decimal
+
+  // Relations
+  receiptItem ReceiptItem @relation(fields: [receipt_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  discount    Discount    @relation(fields: [discount_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("receipt_item_discounts")
+}
+
+// ============= LOGS (AUDIT) =============
+
+model Log {
+  id          Int      @id @default(autoincrement())
+  user_id     Int?
+  event       String   @db.VarChar(255)
+  occurred_at DateTime @db.Timestamp()
+
+  // Relations
+  user User? @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("logs")
+}
