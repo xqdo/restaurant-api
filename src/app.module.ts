@@ -13,6 +13,7 @@ import { DeliveryModule } from './delivery/delivery.module';
 import { ReportsModule } from './reports/reports.module';
 import { AuditModule } from './audit/audit.module';
 import { ExportsModule } from './exports/exports.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ExportsModule } from './exports/exports.module';
     ReportsModule,
     AuditModule,
     ExportsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [AppService],

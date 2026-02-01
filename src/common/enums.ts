@@ -25,3 +25,20 @@ export enum TableStatus {
   OCCUPIED = 'OCCUPIED',
   RESERVED = 'RESERVED',
 }
+
+export enum UnitOfMeasurement {
+  kg = 'kg',
+  g = 'g',
+  liter = 'liter',
+  ml = 'ml',
+  piece = 'piece',
+  pack = 'pack',
+  box = 'box',
+}
+
+export enum UsageReason {
+  production = 'production',
+  waste = 'waste',
+  adjustment = 'adjustment',
+  expired = 'expired',
+}

@@ -38,6 +38,9 @@ model BaseEntity {
   discountItems   DiscountItem[]
   discountConditions DiscountCondition[]
   tables          Table[]
+  storageItems    StorageItem[]
+  storageEntries  StorageEntry[]
+  storageUsages   StorageUsage[]
 
   @@map("base_entity")
 }
@@ -287,6 +290,55 @@ model ReceiptItemDiscount {
   discount    Discount    @relation(fields: [discount_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("receipt_item_discounts")
+}
+
+// ============= STORAGE (INVENTORY) =============
+
+model StorageItem {
+  id               Int       @id @default(autoincrement())
+  name             String
+  description      String?
+  unit             String    // kg, g, liter, ml, piece, pack, box
+  current_quantity Decimal   @default(0)
+  min_quantity     Decimal?  // Alert threshold (optional)
+  base_entity_id   Int
+
+  baseEntity     BaseEntity       @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  storageEntries StorageEntry[]
+  storageUsages  StorageUsage[]
+
+  @@map("storage_items")
+}
+
+model StorageEntry {
+  id              Int       @id @default(autoincrement())
+  storage_item_id Int
+  quantity        Decimal
+  unit_price      Decimal?
+  supplier        String?
+  notes           String?
+  entry_date      DateTime
+  base_entity_id  Int
+
+  storageItem StorageItem @relation(fields: [storage_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  baseEntity  BaseEntity  @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("storage_entries")
+}
+
+model StorageUsage {
+  id              Int       @id @default(autoincrement())
+  storage_item_id Int
+  quantity        Decimal
+  reason          String?   // production, waste, adjustment
+  notes           String?
+  usage_date      DateTime
+  base_entity_id  Int
+
+  storageItem StorageItem @relation(fields: [storage_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  baseEntity  BaseEntity  @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("storage_usages")
 }
 
 // ============= LOGS (AUDIT) =============
