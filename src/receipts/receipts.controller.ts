@@ -21,6 +21,7 @@ import { ReceiptItemsService } from './receipt-items/receipt-items.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { UpdateReceiptItemStatusDto } from './dto/update-receipt-item-status.dto';
 import { FilterReceiptsDto } from './dto/filter-receipts.dto';
+import { CompleteReceiptDto } from './dto/complete-receipt.dto';
 import { ReceiptDetailResponseDto } from './dto/receipt-detail-response.dto';
 import { ReceiptTotalBreakdownDto } from './dto/receipt-total-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -166,10 +167,26 @@ export class ReceiptsController {
     );
   }
 
-  @ApiOperation({ summary: 'Complete receipt (mark as paid)' })
+  @ApiOperation({
+    summary: 'Complete receipt (mark as paid)',
+    description: `
+      Complete/checkout a receipt. Optionally apply a quick discount at checkout.
+
+      **Quick Discount:**
+      - A simple amount to subtract from the total
+      - Does not require creating a discount code
+      - Useful for manager discretionary discounts, rounding, etc.
+      - Cannot exceed the subtotal
+    `,
+  })
   @ApiResponse({
     status: 200,
     description: 'Receipt completed successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Receipt already completed or quick discount exceeds subtotal',
+    type: BadRequestResponseDto,
   })
   @ApiResponse({
     status: 404,
@@ -184,9 +201,10 @@ export class ReceiptsController {
   @Put(':id/complete')
   complete(
     @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CompleteReceiptDto,
     @CurrentUser() user: any,
   ) {
-    return this.receiptsService.complete(id, user.id);
+    return this.receiptsService.complete(id, user.id, dto);
   }
 
   @ApiOperation({

@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BaseEntityService } from '../common/base-entity/base-entity.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { FilterReceiptsDto } from './dto/filter-receipts.dto';
+import { CompleteReceiptDto } from './dto/complete-receipt.dto';
 import { StatusEnum } from '../common/enums';
 
 @Injectable()
@@ -290,11 +291,16 @@ export class ReceiptsService {
   /**
    * Calculate receipt total
    * Subtotal = sum(item.price * quantity)
-   * Discount = sum of all discounts (Phase 4)
+   * Discount = sum of all discounts + quick_discount
    * Total = subtotal - discount
    */
   async calculateTotal(receiptId: number, tx?: any) {
     const prisma = tx || this.prisma;
+
+    // Get receipt for quick_discount
+    const receipt = await prisma.receipt.findUnique({
+      where: { id: receiptId },
+    });
 
     const receiptItems = await prisma.receiptItem.findMany({
       where: {
@@ -309,7 +315,7 @@ export class ReceiptsService {
       return sum + Number(ri.item.price) * Number(ri.quantity);
     }, 0);
 
-    // Get discounts (Phase 4 will implement this - for now return 0)
+    // Get discounts from discount system
     const receiptItemDiscounts = await prisma.receiptItemDiscount.findMany({
       where: {
         receiptItem: {
@@ -318,15 +324,22 @@ export class ReceiptsService {
       },
     });
 
-    const totalDiscount =
+    const systemDiscount =
       receiptItemDiscounts.reduce(
         (sum, rid) => sum + Number(rid.applied_amount),
         0,
       ) || 0;
 
+    // Get quick discount
+    const quickDiscount = receipt?.quick_discount ? Number(receipt.quick_discount) : 0;
+
+    // Total discount = system discounts + quick discount
+    const totalDiscount = systemDiscount + quickDiscount;
+
     return {
       subtotal: Number(subtotal.toFixed(2)),
       total_discount: Number(totalDiscount.toFixed(2)),
+      quick_discount: Number(quickDiscount.toFixed(2)),
       total: Number((subtotal - totalDiscount).toFixed(2)),
     };
   }
@@ -334,8 +347,9 @@ export class ReceiptsService {
   /**
    * Complete receipt (mark as paid)
    * Updates table status back to AVAILABLE for dine-in orders
+   * Optionally applies a quick discount at checkout
    */
-  async complete(id: number, userId: number) {
+  async complete(id: number, userId: number, dto?: CompleteReceiptDto) {
     this.logger.debug(`Completing receipt ${id}`);
 
     const receipt = await this.findOne(id);
@@ -344,10 +358,20 @@ export class ReceiptsService {
       throw new BadRequestException('Receipt is already completed');
     }
 
-    // Mark receipt as completed
+    // Validate quick discount doesn't exceed subtotal
+    if (dto?.quick_discount && dto.quick_discount > receipt.subtotal) {
+      throw new BadRequestException(
+        `Quick discount (${dto.quick_discount}) cannot exceed subtotal (${receipt.subtotal})`
+      );
+    }
+
+    // Mark receipt as completed with optional quick discount
     await this.prisma.receipt.update({
       where: { id },
-      data: { completed_at: new Date() },
+      data: {
+        completed_at: new Date(),
+        quick_discount: dto?.quick_discount || null,
+      },
     });
 
     // Update base entity audit trail
@@ -362,13 +386,19 @@ export class ReceiptsService {
       this.logger.debug(`Table ${receipt.table_id} status updated to AVAILABLE`);
     }
 
+    // Recalculate total with quick discount applied
+    const totals = await this.calculateTotal(id);
+
     this.logger.log(`Receipt ${receipt.number} completed successfully`);
 
     return {
       message: 'Receipt completed successfully',
       receipt_id: id,
       receipt_number: receipt.number,
-      total: receipt.total,
+      subtotal: totals.subtotal,
+      quick_discount: totals.quick_discount,
+      total_discount: totals.total_discount,
+      total: totals.total,
     };
   }
 }

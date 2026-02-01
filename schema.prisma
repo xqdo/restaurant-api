@@ -155,6 +155,7 @@ model Receipt {
   notes          String?
   completed_at   DateTime?
   table_id       Int?
+  quick_discount Decimal?  // Quick discount amount applied at checkout
   base_entity_id Int
 
   // Relations
