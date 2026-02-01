@@ -72,8 +72,9 @@ export class ReportsService {
       // Calculate revenue for this receipt
       let receiptRevenue = 0;
       receipt.receiptItems.forEach((item) => {
+        // Use unit_price (price at time of sale) if available, fallback to item.price
         const itemTotal =
-          parseFloat(item.item.price.toString()) *
+          this.getItemPrice(item) *
           parseFloat(item.quantity.toString());
 
         // Subtract item-level discounts
@@ -161,8 +162,9 @@ export class ReportsService {
 
       let receiptRevenue = 0;
       receipt.receiptItems.forEach((item) => {
+        // Use unit_price (price at time of sale) if available, fallback to item.price
         const itemTotal =
-          parseFloat(item.item.price.toString()) *
+          this.getItemPrice(item) *
           parseFloat(item.quantity.toString());
         const itemDiscounts = item.receiptItemDiscounts.reduce(
           (sum, discount) => sum + parseFloat(discount.applied_amount.toString()),
@@ -234,7 +236,8 @@ export class ReportsService {
     receiptItems.forEach((ri) => {
       const existing = itemsMap.get(ri.item_id);
       const quantity = parseFloat(ri.quantity.toString());
-      const revenue = parseFloat(ri.item.price.toString()) * quantity;
+      // Use unit_price (price at time of sale) if available, fallback to item.price
+      const revenue = this.getItemPrice(ri) * quantity;
 
       if (existing) {
         existing.quantity += quantity;
@@ -309,7 +312,8 @@ export class ReportsService {
       const sectionId = ri.item.section_id;
       const existing = sectionsMap.get(sectionId);
       const quantity = parseFloat(ri.quantity.toString());
-      const revenue = parseFloat(ri.item.price.toString()) * quantity;
+      // Use unit_price (price at time of sale) if available, fallback to item.price
+      const revenue = this.getItemPrice(ri) * quantity;
 
       if (existing) {
         existing.quantity += quantity;
@@ -416,8 +420,9 @@ export class ReportsService {
 
       let receiptRevenue = 0;
       receipt.receiptItems.forEach((item) => {
+        // Use unit_price (price at time of sale) if available, fallback to item.price
         const itemTotal =
-          parseFloat(item.item.price.toString()) *
+          this.getItemPrice(item) *
           parseFloat(item.quantity.toString());
         const itemDiscounts = item.receiptItemDiscounts.reduce(
           (sum, discount) => sum + parseFloat(discount.applied_amount.toString()),
@@ -519,8 +524,9 @@ export class ReportsService {
 
       let receiptRevenue = 0;
       receipt.receiptItems.forEach((item) => {
+        // Use unit_price (price at time of sale) if available, fallback to item.price
         const itemTotal =
-          parseFloat(item.item.price.toString()) *
+          this.getItemPrice(item) *
           parseFloat(item.quantity.toString());
         const itemDiscounts = item.receiptItemDiscounts.reduce(
           (sum, discount) => sum + parseFloat(discount.applied_amount.toString()),
@@ -661,8 +667,9 @@ export class ReportsService {
 
       let receiptRevenue = 0;
       rd.receipt.receiptItems.forEach((item) => {
+        // Use unit_price (price at time of sale) if available, fallback to item.price
         receiptRevenue +=
-          parseFloat(item.item.price.toString()) *
+          this.getItemPrice(item) *
           parseFloat(item.quantity.toString());
       });
 
@@ -692,8 +699,9 @@ export class ReportsService {
 
       let receiptRevenue = 0;
       id.receiptItem.receipt.receiptItems.forEach((item) => {
+        // Use unit_price (price at time of sale) if available, fallback to item.price
         receiptRevenue +=
-          parseFloat(item.item.price.toString()) *
+          this.getItemPrice(item) *
           parseFloat(item.quantity.toString());
       });
 
@@ -731,6 +739,17 @@ export class ReportsService {
       start_date: start,
       end_date: end,
     };
+  }
+
+  /**
+   * Helper method to get item price (uses unit_price if available, falls back to item.price)
+   * This ensures historical reports show correct prices at time of sale
+   */
+  private getItemPrice(receiptItem: any): number {
+    if (receiptItem.unit_price) {
+      return parseFloat(receiptItem.unit_price.toString());
+    }
+    return parseFloat(receiptItem.item.price.toString());
   }
 
   /**

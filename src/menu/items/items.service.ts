@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { BaseEntityService } from '../../common/base-entity/base-entity.service';
 import { ImagesService } from '../images/images.service';
+import { PriceHistoryService } from '../price-history/price-history.service';
 import { CreateItemDto } from '../dto/create-item.dto';
 import { UpdateItemDto } from '../dto/update-item.dto';
 import { FilterItemsDto } from '../dto/filter-items.dto';
@@ -19,6 +20,7 @@ export class ItemsService {
     private readonly prisma: PrismaService,
     private readonly baseEntityService: BaseEntityService,
     private readonly imagesService: ImagesService,
+    private readonly priceHistoryService: PriceHistoryService,
   ) {}
 
   /**
@@ -125,7 +127,7 @@ export class ItemsService {
     // Create base entity
     const baseEntity = await this.baseEntityService.create(userId);
 
-    return this.prisma.item.create({
+    const item = await this.prisma.item.create({
       data: {
         name: createItemDto.name,
         section_id: createItemDto.section_id,
@@ -140,6 +142,15 @@ export class ItemsService {
         baseEntity: true,
       },
     });
+
+    // Initialize price history for the new item
+    await this.priceHistoryService.initializePriceHistory(
+      item.id,
+      createItemDto.price,
+      userId,
+    );
+
+    return item;
   }
 
   /**
@@ -173,6 +184,17 @@ export class ItemsService {
         throw new BadRequestException(
           `Image with ID ${updateItemDto.image_id} not found`,
         );
+      }
+    }
+
+    // Check if price is being changed and record in history
+    if (updateItemDto.price !== undefined) {
+      const currentPrice = Number(item.price);
+      const newPrice = updateItemDto.price;
+
+      if (newPrice !== currentPrice) {
+        this.logger.debug(`Price change detected for item ${id}: ${currentPrice} -> ${newPrice}`);
+        await this.priceHistoryService.recordPriceChange(id, newPrice, userId);
       }
     }
 

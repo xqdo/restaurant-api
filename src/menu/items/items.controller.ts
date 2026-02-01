@@ -25,6 +25,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { ItemsService } from './items.service';
+import { PriceHistoryService } from '../price-history/price-history.service';
 import { CreateItemDto } from '../dto/create-item.dto';
 import { UpdateItemDto } from '../dto/update-item.dto';
 import { FilterItemsDto } from '../dto/filter-items.dto';
@@ -46,7 +47,10 @@ import {
 @Controller('menu/items')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ItemsController {
-  constructor(private readonly itemsService: ItemsService) {}
+  constructor(
+    private readonly itemsService: ItemsService,
+    private readonly priceHistoryService: PriceHistoryService,
+  ) {}
 
   @ApiOperation({
     summary: 'Get all menu items with optional filters',
@@ -271,6 +275,27 @@ export class ItemsController {
       throw new BadRequestException('No file uploaded');
     }
     return this.itemsService.uploadImage(id, file, user.id);
+  }
+
+  @ApiOperation({
+    summary: 'Get price history for menu item',
+    description: 'Returns the history of price changes for this item',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns price history list',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Item not found',
+    type: NotFoundResponseDto,
+  })
+  @ApiBearerAuth('JWT-auth')
+  @Get(':id/price-history')
+  async getPriceHistory(@Param('id', ParseIntPipe) id: number) {
+    // Validate item exists
+    await this.itemsService.findOne(id);
+    return this.priceHistoryService.getPriceHistory(id);
   }
 
   @ApiOperation({ summary: 'Soft delete menu item (Manager/Admin only)' })

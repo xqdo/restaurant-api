@@ -55,7 +55,8 @@ export class ExportsService {
     // Prepare CSV data
     const csvData = receipts.map((receipt) => {
       const itemsTotal = receipt.receiptItems.reduce((sum, ri) => {
-        return sum + parseFloat(ri.item.price.toString()) * parseFloat(ri.quantity.toString());
+        // Use unit_price (price at time of sale) if available, fallback to item.price
+        return sum + this.getItemPrice(ri) * parseFloat(ri.quantity.toString());
       }, 0);
 
       const itemsList = receipt.receiptItems
@@ -178,7 +179,8 @@ export class ExportsService {
 
     receipts.forEach((receipt) => {
       const itemsTotal = receipt.receiptItems.reduce((sum, ri) => {
-        return sum + parseFloat(ri.item.price.toString()) * parseFloat(ri.quantity.toString());
+        // Use unit_price (price at time of sale) if available, fallback to item.price
+        return sum + this.getItemPrice(ri) * parseFloat(ri.quantity.toString());
       }, 0);
 
       totalRevenue += itemsTotal;
@@ -223,7 +225,8 @@ export class ExportsService {
     receipts.forEach((receipt) => {
       receipt.receiptItems.forEach((ri) => {
         const quantity = parseFloat(ri.quantity.toString());
-        const price = parseFloat(ri.item.price.toString());
+        // Use unit_price (price at time of sale) if available, fallback to item.price
+        const price = this.getItemPrice(ri);
 
         itemsSheet.addRow({
           receipt_number: receipt.number,
@@ -339,6 +342,17 @@ export class ExportsService {
         end: dto.end_date,
       });
     }
+  }
+
+  /**
+   * Helper method to get item price (uses unit_price if available, falls back to item.price)
+   * This ensures historical exports show correct prices at time of sale
+   */
+  private getItemPrice(receiptItem: any): number {
+    if (receiptItem.unit_price) {
+      return parseFloat(receiptItem.unit_price.toString());
+    }
+    return parseFloat(receiptItem.item.price.toString());
   }
 
   /**

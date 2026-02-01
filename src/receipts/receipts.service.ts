@@ -105,9 +105,12 @@ export class ReceiptsService {
         },
       });
 
-      // 4. Create receipt items
+      // 4. Create receipt items with unit_price captured at time of sale
       const receiptItems: any[] = [];
       for (const itemDto of dto.items) {
+        // Get the item to capture its current price
+        const itemRecord = items.find((i) => i.id === itemDto.item_id);
+
         const itemBaseEntity = await tx.baseEntity.create({
           data: {
             created_at: new Date(),
@@ -120,6 +123,7 @@ export class ReceiptsService {
             receipt_id: receipt.id,
             item_id: itemDto.item_id,
             quantity: itemDto.quantity,
+            unit_price: itemRecord?.price, // Capture price at time of sale
             status: StatusEnum.pending,
             notes: itemDto.notes,
             base_entity_id: itemBaseEntity.id,
@@ -310,9 +314,10 @@ export class ReceiptsService {
       include: { item: true },
     });
 
-    // Calculate subtotal
+    // Calculate subtotal using unit_price (price at time of sale) with fallback to current item price
     const subtotal = receiptItems.reduce((sum, ri) => {
-      return sum + Number(ri.item.price) * Number(ri.quantity);
+      const price = ri.unit_price ? Number(ri.unit_price) : Number(ri.item.price);
+      return sum + price * Number(ri.quantity);
     }, 0);
 
     // Get discounts from discount system

@@ -38,9 +38,10 @@ model BaseEntity {
   discountItems   DiscountItem[]
   discountConditions DiscountCondition[]
   tables          Table[]
-  storageItems    StorageItem[]
-  storageEntries  StorageEntry[]
-  storageUsages   StorageUsage[]
+  storageItems     StorageItem[]
+  storageEntries   StorageEntry[]
+  storageUsages    StorageUsage[]
+  itemPriceHistory ItemPriceHistory[]
 
   @@map("base_entity")
 }
@@ -135,11 +136,12 @@ model Item {
   base_entity_id Int
 
   // Relations
-  section        Section         @relation(fields: [section_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  image          Image?          @relation(fields: [image_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  baseEntity     BaseEntity      @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  section        Section            @relation(fields: [section_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  image          Image?             @relation(fields: [image_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  baseEntity     BaseEntity         @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   receiptItems   ReceiptItem[]
   discountItems  DiscountItem[]
+  priceHistory   ItemPriceHistory[]
 
   @@map("items")
 }
@@ -173,6 +175,7 @@ model ReceiptItem {
   receipt_id     Int
   item_id        Int
   quantity       Decimal
+  unit_price     Decimal?   // Price at time of sale (for historical accuracy)
   status         String     @default("pending") // pending, preparing, ready, done
   notes          String?
   base_entity_id Int
@@ -340,6 +343,23 @@ model StorageUsage {
   baseEntity  BaseEntity  @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("storage_usages")
+}
+
+// ============= PRICE HISTORY =============
+
+model ItemPriceHistory {
+  id             Int       @id @default(autoincrement())
+  item_id        Int
+  price          Decimal
+  effective_from DateTime
+  effective_to   DateTime? // NULL = current price
+  base_entity_id Int
+
+  // Relations
+  item       Item       @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  baseEntity BaseEntity @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("item_price_history")
 }
 
 // ============= LOGS (AUDIT) =============
