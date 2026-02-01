@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsOptional,
   IsBoolean,
@@ -7,16 +7,31 @@ import {
   IsDateString,
   IsPositive,
   Min,
+  IsIn,
+  IsString,
 } from 'class-validator';
 
 export class FilterReceiptsDto {
+  @ApiPropertyOptional({
+    example: 'false',
+    description: 'Filter by completion status. "false" = pending orders, "true" = completed orders',
+  })
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  completed?: string;
+
   @ApiPropertyOptional({
     example: true,
     description: 'Filter by delivery orders',
   })
   @IsOptional()
   @IsBoolean()
-  @Type(() => Boolean)
+  @Transform(({ obj }) => {
+    const raw = obj.is_delivery;
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    return raw;
+  })
   is_delivery?: boolean;
 
   @ApiPropertyOptional({

@@ -3,7 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ReceiptsService } from './receipts.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BaseEntityService } from '../common/base-entity/base-entity.service';
-import { StatusEnum } from '@prisma/client';
+import { StatusEnum } from '../common/enums';
 
 describe('ReceiptsService', () => {
   let service: ReceiptsService;

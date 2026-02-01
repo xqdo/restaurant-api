@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum } from 'class-validator';
-import { TableStatus } from '@prisma/client';
+import { TableStatus } from '../../common/enums';
 
 export class UpdateTableStatusDto {
   @ApiProperty({

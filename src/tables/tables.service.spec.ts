@@ -3,7 +3,7 @@ import { NotFoundException, ConflictException } from '@nestjs/common';
 import { TablesService } from './tables.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BaseEntityService } from '../common/base-entity/base-entity.service';
-import { TableStatus } from '@prisma/client';
+import { TableStatus } from '../common/enums';
 
 describe('TablesService', () => {
   let service: TablesService;

@@ -9,7 +9,7 @@ import { BaseEntityService } from '../common/base-entity/base-entity.service';
 import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
 import { FilterTablesDto } from './dto/filter-tables.dto';
-import { TableStatus } from '@prisma/client';
+import { TableStatus } from '../common/enums';
 
 @Injectable()
 export class TablesService {

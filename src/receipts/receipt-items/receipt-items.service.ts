@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BaseEntityService } from '../../common/base-entity/base-entity.service';
-import { StatusEnum } from '@prisma/client';
+import { StatusEnum } from '../../common/enums';
 
 @Injectable()
 export class ReceiptItemsService {
@@ -52,7 +52,7 @@ export class ReceiptItemsService {
     }
 
     // Validate status transition
-    this.validateStatusTransition(receiptItem.status, status);
+    this.validateStatusTransition(receiptItem.status as StatusEnum, status);
 
     // Update item status
     await this.prisma.receiptItem.update({

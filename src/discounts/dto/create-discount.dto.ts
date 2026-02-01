@@ -12,7 +12,7 @@ import {
   Min,
   Max,
 } from 'class-validator';
-import { DiscountTypeEnum } from '@prisma/client';
+import { DiscountTypeEnum } from '../../common/enums';
 
 export class CreateDiscountDto {
   @ApiProperty({

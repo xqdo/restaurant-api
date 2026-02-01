@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional } from 'class-validator';
-import { TableStatus } from '@prisma/client';
+import { TableStatus } from '../../common/enums';
 
 export class FilterTablesDto {
   @ApiPropertyOptional({

@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BaseEntityService } from '../common/base-entity/base-entity.service';
 import { CreateDiscountDto } from './dto/create-discount.dto';
 import { UpdateDiscountDto } from './dto/update-discount.dto';
-import { DiscountTypeEnum, ConditionTypeEnum } from '@prisma/client';
+import { DiscountTypeEnum, ConditionTypeEnum } from '../common/enums';
 
 @Injectable()
 export class DiscountsService {

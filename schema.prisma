@@ -6,51 +6,19 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-}
-
-// ============= ENUMS =============
-
-enum StatusEnum {
-  pending
-  preparing
-  ready
-  done
-
-  @@map("status_t")
-}
-
-enum DiscountTypeEnum {
-  amount
-  percentage
-  combo
-
-  @@map("type_t")
-}
-
-enum ConditionTypeEnum {
-  min_amount
-  day_of_week
-
-  @@map("condition_type_t")
-}
-
-enum TableStatus {
-  AVAILABLE
-  OCCUPIED
-  RESERVED
 }
 
 // ============= BASE ENTITY (Audit Trail) =============
 
 model BaseEntity {
   id          Int       @id @default(autoincrement())
-  created_at  DateTime  @db.Timestamp()
+  created_at  DateTime
   created_by  Int?
-  updated_at  DateTime? @map("upadated_at") @db.Timestamp() // Keep typo from SQL schema
+  updated_at  DateTime? @map("upadated_at") // Keep typo from SQL schema
   updated_by  Int?
-  deleted_at  DateTime? @db.Timestamp()
+  deleted_at  DateTime?
   deleted_by  Int?
   isdeleted   Boolean   @default(false)
 
@@ -78,7 +46,7 @@ model BaseEntity {
 
 model Role {
   id        Int        @id @default(autoincrement())
-  name      String     @db.VarChar(255)
+  name      String
   userRoles UserRole[]
 
   @@map("roles")
@@ -86,9 +54,9 @@ model Role {
 
 model User {
   id             Int    @id @default(autoincrement())
-  fullname       String @db.VarChar(255)
-  username       String @db.VarChar(255)
-  password       String @db.VarChar(255)
+  fullname       String
+  username       String
+  password       String
   is_active      Boolean @default(true)
   base_entity_id Int
 
@@ -122,7 +90,7 @@ model UserRole {
 model Table {
   id             Int          @id @default(autoincrement())
   number         Int          @unique
-  status         TableStatus  @default(AVAILABLE)
+  status         String       @default("AVAILABLE") // AVAILABLE, OCCUPIED, RESERVED
   base_entity_id Int
 
   // Relations
@@ -136,7 +104,7 @@ model Table {
 
 model Image {
   id    Int    @id @default(autoincrement())
-  path  String @db.VarChar(255)
+  path  String
   items Item[]
 
   @@map("images")
@@ -144,7 +112,7 @@ model Image {
 
 model Section {
   id             Int    @id @default(autoincrement())
-  name           String @db.VarChar(255)
+  name           String
   base_entity_id Int
 
   // Relations
@@ -156,11 +124,11 @@ model Section {
 
 model Item {
   id             Int     @id @default(autoincrement())
-  name           String  @db.VarChar(255)
+  name           String
   section_id     Int
-  price          Decimal @db.Decimal
+  price          Decimal
   image_id       Int?
-  description    String? @db.Text
+  description    String?
   base_entity_id Int
 
   // Relations
@@ -176,12 +144,13 @@ model Item {
 // ============= RECEIPTS (ORDERS) =============
 
 model Receipt {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   number         Int
-  is_delivery    Boolean  @default(false)
-  phone_number   String?  @db.VarChar(255)
-  location       String?  @db.VarChar(255)
-  notes          String?  @db.Text
+  is_delivery    Boolean   @default(false)
+  phone_number   String?
+  location       String?
+  notes          String?
+  completed_at   DateTime?
   table_id       Int?
   base_entity_id Int
 
@@ -199,9 +168,9 @@ model ReceiptItem {
   id             Int        @id @default(autoincrement())
   receipt_id     Int
   item_id        Int
-  quantity       Decimal    @db.Decimal
-  status         StatusEnum @default(pending)
-  notes          String?    @db.Text
+  quantity       Decimal
+  status         String     @default("pending") // pending, preparing, ready, done
+  notes          String?
   base_entity_id Int
 
   // Relations
@@ -217,8 +186,8 @@ model ReceiptItem {
 
 model DeliveryGuy {
   id             Int    @id @default(autoincrement())
-  name           String @db.VarChar(255)
-  phone_number   String @db.VarChar(255)
+  name           String
+  phone_number   String
   base_entity_id Int
 
   // Relations
@@ -245,14 +214,14 @@ model DeliveryReceipt {
 
 model Discount {
   id             Int               @id @default(autoincrement())
-  name           String            @db.VarChar(255)
-  code           String            @unique @db.VarChar(255)
-  type           DiscountTypeEnum
+  name           String
+  code           String            @unique
+  type           String // amount, percentage, combo
   max_receipts   Int?
-  amount         Decimal?          @db.Decimal
-  persentage     Decimal?          @db.Decimal @map("persentage") // Keep typo from SQL schema
-  start_date     DateTime          @db.Timestamp()
-  end_date       DateTime          @db.Timestamp()
+  amount         Decimal?
+  persentage     Decimal?          @map("persentage") // Keep typo from SQL schema
+  start_date     DateTime
+  end_date       DateTime
   is_active      Boolean           @default(true)
   base_entity_id Int
 
@@ -270,7 +239,7 @@ model DiscountItem {
   id             Int     @id @default(autoincrement())
   item_id        Int
   discount_id    Int
-  min_quantity   Decimal @default(1) @db.Decimal
+  min_quantity   Decimal @default(1)
   base_entity_id Int
 
   // Relations
@@ -284,8 +253,8 @@ model DiscountItem {
 model DiscountCondition {
   id             Int               @id @default(autoincrement())
   discount_id    Int
-  condition_type ConditionTypeEnum
-  value          String            @db.VarChar(255)
+  condition_type String // min_amount, day_of_week
+  value          String
   base_entity_id Int
 
   // Relations
@@ -311,7 +280,7 @@ model ReceiptItemDiscount {
   id              Int     @id @default(autoincrement())
   receipt_item_id Int
   discount_id     Int
-  applied_amount  Decimal @db.Decimal
+  applied_amount  Decimal
 
   // Relations
   receiptItem ReceiptItem @relation(fields: [receipt_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -325,8 +294,8 @@ model ReceiptItemDiscount {
 model Log {
   id          Int      @id @default(autoincrement())
   user_id     Int?
-  event       String   @db.VarChar(255)
-  occurred_at DateTime @db.Timestamp()
+  event       String
+  occurred_at DateTime
 
   // Relations
   user User? @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

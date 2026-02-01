@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BaseEntityService } from '../common/base-entity/base-entity.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { FilterReceiptsDto } from './dto/filter-receipts.dto';
-import { StatusEnum } from '@prisma/client';
+import { StatusEnum } from '../common/enums';
 
 @Injectable()
 export class ReceiptsService {
@@ -216,6 +216,15 @@ export class ReceiptsService {
       baseEntity: { isdeleted: false },
     };
 
+    // Filter by completion status
+    if (query.completed !== undefined) {
+      if (query.completed === 'true') {
+        where.completed_at = { not: null };
+      } else {
+        where.completed_at = null;
+      }
+    }
+
     // Filter by delivery
     if (query.is_delivery !== undefined) {
       where.is_delivery = query.is_delivery;
@@ -331,6 +340,16 @@ export class ReceiptsService {
 
     const receipt = await this.findOne(id);
 
+    if (receipt.completed_at) {
+      throw new BadRequestException('Receipt is already completed');
+    }
+
+    // Mark receipt as completed
+    await this.prisma.receipt.update({
+      where: { id },
+      data: { completed_at: new Date() },
+    });
+
     // Update base entity audit trail
     await this.baseEntityService.update(receipt.base_entity_id, userId);
 
@@ -343,7 +362,7 @@ export class ReceiptsService {
       this.logger.debug(`Table ${receipt.table_id} status updated to AVAILABLE`);
     }
 
-    this.logger.log(`Receipt ${receipt.number} completed successfully. Total: $${receipt.total}`);
+    this.logger.log(`Receipt ${receipt.number} completed successfully`);
 
     return {
       message: 'Receipt completed successfully',

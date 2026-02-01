@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { DiscountTypeEnum, ConditionTypeEnum } from '@prisma/client';
+import { DiscountTypeEnum, ConditionTypeEnum } from '../common/enums';
 
 @Injectable()
 export class DiscountEngineService {
