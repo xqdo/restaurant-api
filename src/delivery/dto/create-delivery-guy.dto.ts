@@ -7,11 +7,11 @@ export class CreateDeliveryGuyDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: '+1234567890' })
+  @ApiProperty({ example: '07858004369' })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\+?[1-9]\d{1,14}$/, {
-    message: 'Phone number must be in valid format',
+  @Matches(/^(\+?964|0)?[0-9]{10}$/, {
+    message: 'Phone number must be in valid format (e.g., 07858004369 or +9647858004369)',
   })
   phone_number: string;
 }
