@@ -19,6 +19,15 @@ export class CreateReceiptDto {
   is_delivery: boolean;
 
   @ApiPropertyOptional({
+    example: 'أحمد محمد',
+    description: 'Customer name (required for delivery)',
+  })
+  @ValidateIf((o) => o.is_delivery === true)
+  @IsString()
+  @IsNotEmpty({ message: 'Customer name is required for delivery orders' })
+  customer_name?: string;
+
+  @ApiPropertyOptional({
     example: '+1234567890',
     description: 'Customer phone number (required for delivery)',
   })
@@ -38,11 +47,10 @@ export class CreateReceiptDto {
 
   @ApiPropertyOptional({
     example: 5,
-    description: 'Table ID (required for dine-in)',
+    description: 'Table ID (optional for local orders, not needed for take-away)',
   })
-  @ValidateIf((o) => o.is_delivery === false)
   @IsNumber()
-  @IsNotEmpty({ message: 'Table ID is required for dine-in orders' })
+  @IsOptional()
   table_id?: number;
 
   @ApiPropertyOptional({

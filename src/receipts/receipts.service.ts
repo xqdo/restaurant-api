@@ -27,17 +27,28 @@ export class ReceiptsService {
   async create(dto: CreateReceiptDto, userId: number) {
     this.logger.debug(`Creating receipt: ${JSON.stringify(dto)}`);
 
-    // Validation: Delivery orders need phone and location
-    if (dto.is_delivery && (!dto.phone_number || !dto.location)) {
-      throw new BadRequestException(
-        'Delivery orders require phone_number and location',
-      );
+    // Validation: Delivery orders need customer_name, phone and location
+    if (dto.is_delivery) {
+      if (!dto.customer_name || !dto.customer_name.trim()) {
+        throw new BadRequestException(
+          'Delivery orders require customer_name',
+        );
+      }
+      if (!dto.phone_number || !dto.phone_number.trim()) {
+        throw new BadRequestException(
+          'Delivery orders require phone_number',
+        );
+      }
+      if (!dto.location || !dto.location.trim()) {
+        throw new BadRequestException(
+          'Delivery orders require location',
+        );
+      }
     }
 
-    // Validation: Dine-in orders need table
-    if (!dto.is_delivery && !dto.table_id) {
-      throw new BadRequestException('Dine-in orders require table_id');
-    }
+    // Note: Local and take-away orders (is_delivery=false) are differentiated by table_id
+    // Local orders will have table_id, take-away orders will not have table_id
+    // No explicit validation needed - table_id is optional for non-delivery orders
 
     // Validate table exists and is available (if dine-in)
     if (dto.table_id) {
@@ -97,6 +108,7 @@ export class ReceiptsService {
         data: {
           number: nextNumber,
           is_delivery: dto.is_delivery,
+          customer_name: dto.customer_name,
           phone_number: dto.phone_number,
           location: dto.location,
           notes: dto.notes,

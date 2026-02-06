@@ -152,6 +152,7 @@ model Receipt {
   id             Int       @id @default(autoincrement())
   number         Int
   is_delivery    Boolean   @default(false)
+  customer_name  String?   // Customer name for delivery orders
   phone_number   String?
   location       String?
   notes          String?
