@@ -78,7 +78,7 @@ describe('ReceiptsService', () => {
       notes: 'Test order',
       items: [
         { item_id: 1, quantity: 2, notes: 'No onions' },
-        { item_id: 2, quantity: 1, notes: null },
+        { item_id: 2, quantity: 1, notes: undefined },
       ],
     };
 
@@ -87,7 +87,7 @@ describe('ReceiptsService', () => {
       phone_number: '+1234567890',
       location: '123 Main St',
       notes: 'Leave at door',
-      items: [{ item_id: 1, quantity: 1, notes: null }],
+      items: [{ item_id: 1, quantity: 1, notes: undefined }],
     };
 
     it('should throw BadRequestException if delivery without phone/location', async () => {
@@ -241,7 +241,7 @@ describe('ReceiptsService', () => {
       const result = await service.calculateTotal(1);
 
       expect(result.subtotal).toBe(30.97);
-      expect(result.total_discount).toBe(0);
+      expect(result.discount).toBe(0);
       expect(result.total).toBe(30.97);
     });
   });
@@ -262,7 +262,7 @@ describe('ReceiptsService', () => {
       jest.spyOn(service, 'findOne').mockResolvedValue(mockReceipt as any);
       jest.spyOn(service, 'calculateTotal').mockResolvedValue({
         subtotal: 30.97,
-        total_discount: 0,
+        discount: 0,
         total: 30.97,
       });
 
