@@ -34,9 +34,6 @@ model BaseEntity {
   receipts        Receipt[]
   receiptItems    ReceiptItem[]
   deliveryGuys    DeliveryGuy[]
-  discounts       Discount[]
-  discountItems   DiscountItem[]
-  discountConditions DiscountCondition[]
   tables          Table[]
   storageItems     StorageItem[]
   storageEntries   StorageEntry[]
@@ -140,7 +137,6 @@ model Item {
   image          Image?             @relation(fields: [image_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   baseEntity     BaseEntity         @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   receiptItems   ReceiptItem[]
-  discountItems  DiscountItem[]
   priceHistory   ItemPriceHistory[]
 
   @@map("items")
@@ -166,7 +162,6 @@ model Receipt {
   table             Table?              @relation(fields: [table_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   receiptItems      ReceiptItem[]
   deliveryReceipts  DeliveryReceipt[]
-  receiptDiscounts  ReceiptDiscount[]
 
   @@map("receipt")
 }
@@ -185,7 +180,6 @@ model ReceiptItem {
   receipt               Receipt                @relation(fields: [receipt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   item                  Item                   @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   baseEntity            BaseEntity             @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  receiptItemDiscounts  ReceiptItemDiscount[]
 
   @@map("receipt_items")
 }
@@ -216,85 +210,6 @@ model DeliveryReceipt {
   receipt     Receipt     @relation(fields: [receipt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("delivery_receipts")
-}
-
-// ============= DISCOUNTS =============
-
-model Discount {
-  id             Int               @id @default(autoincrement())
-  name           String
-  code           String            @unique
-  type           String // amount, percentage, combo
-  max_receipts   Int?
-  amount         Decimal?
-  persentage     Decimal?          @map("persentage") // Keep typo from SQL schema
-  start_date     DateTime
-  end_date       DateTime
-  is_active      Boolean           @default(true)
-  base_entity_id Int
-
-  // Relations
-  baseEntity            BaseEntity            @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  discountItems         DiscountItem[]
-  discountConditions    DiscountCondition[]
-  receiptDiscounts      ReceiptDiscount[]
-  receiptItemDiscounts  ReceiptItemDiscount[]
-
-  @@map("discounts")
-}
-
-model DiscountItem {
-  id             Int     @id @default(autoincrement())
-  item_id        Int
-  discount_id    Int
-  min_quantity   Decimal @default(1)
-  base_entity_id Int
-
-  // Relations
-  item       Item       @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  discount   Discount   @relation(fields: [discount_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  baseEntity BaseEntity @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@map("discount_items")
-}
-
-model DiscountCondition {
-  id             Int               @id @default(autoincrement())
-  discount_id    Int
-  condition_type String // min_amount, day_of_week
-  value          String
-  base_entity_id Int
-
-  // Relations
-  discount   Discount   @relation(fields: [discount_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  baseEntity BaseEntity @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@map("discount_conditions")
-}
-
-model ReceiptDiscount {
-  id          Int @id @default(autoincrement())
-  receipt_id  Int
-  discount_id Int
-
-  // Relations
-  receipt  Receipt  @relation(fields: [receipt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  discount Discount @relation(fields: [discount_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@map("receipt_discounts")
-}
-
-model ReceiptItemDiscount {
-  id              Int     @id @default(autoincrement())
-  receipt_item_id Int
-  discount_id     Int
-  applied_amount  Decimal
-
-  // Relations
-  receiptItem ReceiptItem @relation(fields: [receipt_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  discount    Discount    @relation(fields: [discount_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@map("receipt_item_discounts")
 }
 
 // ============= STORAGE (INVENTORY) =============

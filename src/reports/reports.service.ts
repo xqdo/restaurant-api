@@ -45,12 +45,6 @@ export class ReportsService {
         receiptItems: {
           include: {
             item: true,
-            receiptItemDiscounts: true,
-          },
-        },
-        receiptDiscounts: {
-          include: {
-            discount: true,
           },
         },
       },
@@ -77,23 +71,13 @@ export class ReportsService {
           this.getItemPrice(item) *
           parseFloat(item.quantity.toString());
 
-        // Subtract item-level discounts
-        const itemDiscounts = item.receiptItemDiscounts.reduce(
-          (sum, discount) => sum + parseFloat(discount.applied_amount.toString()),
-          0,
-        );
-
-        receiptRevenue += itemTotal - itemDiscounts;
+        receiptRevenue += itemTotal;
       });
 
-      // Subtract receipt-level discounts
-      receipt.receiptDiscounts.forEach((rd) => {
-        if (rd.discount.amount) {
-          receiptRevenue -= parseFloat(rd.discount.amount.toString());
-        } else if (rd.discount.persentage) {
-          receiptRevenue *= 1 - parseFloat(rd.discount.persentage.toString()) / 100;
-        }
-      });
+      // Subtract quick discount if any
+      if (receipt.quick_discount) {
+        receiptRevenue -= parseFloat(receipt.quick_discount.toString());
+      }
 
       totalRevenue += receiptRevenue;
     });
@@ -138,12 +122,6 @@ export class ReportsService {
         receiptItems: {
           include: {
             item: true,
-            receiptItemDiscounts: true,
-          },
-        },
-        receiptDiscounts: {
-          include: {
-            discount: true,
           },
         },
       },
@@ -166,20 +144,13 @@ export class ReportsService {
         const itemTotal =
           this.getItemPrice(item) *
           parseFloat(item.quantity.toString());
-        const itemDiscounts = item.receiptItemDiscounts.reduce(
-          (sum, discount) => sum + parseFloat(discount.applied_amount.toString()),
-          0,
-        );
-        receiptRevenue += itemTotal - itemDiscounts;
+        receiptRevenue += itemTotal;
       });
 
-      receipt.receiptDiscounts.forEach((rd) => {
-        if (rd.discount.amount) {
-          receiptRevenue -= parseFloat(rd.discount.amount.toString());
-        } else if (rd.discount.persentage) {
-          receiptRevenue *= 1 - parseFloat(rd.discount.persentage.toString()) / 100;
-        }
-      });
+      // Subtract quick discount if any
+      if (receipt.quick_discount) {
+        receiptRevenue -= parseFloat(receipt.quick_discount.toString());
+      }
 
       totalRevenue += receiptRevenue;
     });
@@ -397,12 +368,6 @@ export class ReportsService {
         receiptItems: {
           include: {
             item: true,
-            receiptItemDiscounts: true,
-          },
-        },
-        receiptDiscounts: {
-          include: {
-            discount: true,
           },
         },
       },
@@ -424,20 +389,13 @@ export class ReportsService {
         const itemTotal =
           this.getItemPrice(item) *
           parseFloat(item.quantity.toString());
-        const itemDiscounts = item.receiptItemDiscounts.reduce(
-          (sum, discount) => sum + parseFloat(discount.applied_amount.toString()),
-          0,
-        );
-        receiptRevenue += itemTotal - itemDiscounts;
+        receiptRevenue += itemTotal;
       });
 
-      receipt.receiptDiscounts.forEach((rd) => {
-        if (rd.discount.amount) {
-          receiptRevenue -= parseFloat(rd.discount.amount.toString());
-        } else if (rd.discount.persentage) {
-          receiptRevenue *= 1 - parseFloat(rd.discount.persentage.toString()) / 100;
-        }
-      });
+      // Subtract quick discount if any
+      if (receipt.quick_discount) {
+        receiptRevenue -= parseFloat(receipt.quick_discount.toString());
+      }
 
       const existing = staffMap.get(userId);
       if (existing) {
@@ -502,12 +460,6 @@ export class ReportsService {
         receiptItems: {
           include: {
             item: true,
-            receiptItemDiscounts: true,
-          },
-        },
-        receiptDiscounts: {
-          include: {
-            discount: true,
           },
         },
       },
@@ -528,20 +480,13 @@ export class ReportsService {
         const itemTotal =
           this.getItemPrice(item) *
           parseFloat(item.quantity.toString());
-        const itemDiscounts = item.receiptItemDiscounts.reduce(
-          (sum, discount) => sum + parseFloat(discount.applied_amount.toString()),
-          0,
-        );
-        receiptRevenue += itemTotal - itemDiscounts;
+        receiptRevenue += itemTotal;
       });
 
-      receipt.receiptDiscounts.forEach((rd) => {
-        if (rd.discount.amount) {
-          receiptRevenue -= parseFloat(rd.discount.amount.toString());
-        } else if (rd.discount.persentage) {
-          receiptRevenue *= 1 - parseFloat(rd.discount.persentage.toString()) / 100;
-        }
-      });
+      // Subtract quick discount if any
+      if (receipt.quick_discount) {
+        receiptRevenue -= parseFloat(receipt.quick_discount.toString());
+      }
 
       const existing = tablesMap.get(receipt.table_id);
       if (existing) {
@@ -582,160 +527,10 @@ export class ReportsService {
   async getDiscountUsage(dto: DateRangeDto): Promise<DiscountUsageReportDto> {
     const { start, end } = this.calculateDateRange(dto);
 
-    this.logger.debug(`Generating discount usage report`);
-
-    const startDate = new Date(start);
-    startDate.setHours(0, 0, 0, 0);
-
-    const endDate = new Date(end);
-    endDate.setHours(23, 59, 59, 999);
-
-    // Get receipt-level discounts
-    const receiptDiscounts = await this.prisma.receiptDiscount.findMany({
-      where: {
-        receipt: {
-          baseEntity: {
-            created_at: {
-              gte: startDate,
-              lte: endDate,
-            },
-            isdeleted: false,
-          },
-        },
-      },
-      include: {
-        discount: true,
-        receipt: {
-          include: {
-            receiptItems: {
-              include: {
-                item: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    // Get item-level discounts
-    const itemDiscounts = await this.prisma.receiptItemDiscount.findMany({
-      where: {
-        receiptItem: {
-          baseEntity: {
-            created_at: {
-              gte: startDate,
-              lte: endDate,
-            },
-            isdeleted: false,
-          },
-        },
-      },
-      include: {
-        discount: true,
-        receiptItem: {
-          include: {
-            receipt: {
-              include: {
-                receiptItems: {
-                  include: {
-                    item: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    // Aggregate discount usage
-    const discountsMap = new Map<
-      number,
-      {
-        discount: any;
-        timesUsed: number;
-        totalDiscountAmount: number;
-        totalRevenue: number;
-      }
-    >();
-
-    // Process receipt-level discounts
-    receiptDiscounts.forEach((rd) => {
-      const discountAmount = rd.discount.amount
-        ? parseFloat(rd.discount.amount.toString())
-        : 0;
-
-      let receiptRevenue = 0;
-      rd.receipt.receiptItems.forEach((item) => {
-        // Use unit_price (price at time of sale) if available, fallback to item.price
-        receiptRevenue +=
-          this.getItemPrice(item) *
-          parseFloat(item.quantity.toString());
-      });
-
-      if (rd.discount.persentage) {
-        const percentage = parseFloat(rd.discount.persentage.toString());
-        receiptRevenue -= (receiptRevenue * percentage) / 100;
-      }
-
-      const existing = discountsMap.get(rd.discount_id);
-      if (existing) {
-        existing.timesUsed++;
-        existing.totalDiscountAmount += discountAmount;
-        existing.totalRevenue += receiptRevenue;
-      } else {
-        discountsMap.set(rd.discount_id, {
-          discount: rd.discount,
-          timesUsed: 1,
-          totalDiscountAmount: discountAmount,
-          totalRevenue: receiptRevenue,
-        });
-      }
-    });
-
-    // Process item-level discounts
-    itemDiscounts.forEach((id) => {
-      const discountAmount = parseFloat(id.applied_amount.toString());
-
-      let receiptRevenue = 0;
-      id.receiptItem.receipt.receiptItems.forEach((item) => {
-        // Use unit_price (price at time of sale) if available, fallback to item.price
-        receiptRevenue +=
-          this.getItemPrice(item) *
-          parseFloat(item.quantity.toString());
-      });
-
-      const existing = discountsMap.get(id.discount_id);
-      if (existing) {
-        existing.timesUsed++;
-        existing.totalDiscountAmount += discountAmount;
-        existing.totalRevenue += receiptRevenue;
-      } else {
-        discountsMap.set(id.discount_id, {
-          discount: id.discount,
-          timesUsed: 1,
-          totalDiscountAmount: discountAmount,
-          totalRevenue: receiptRevenue,
-        });
-      }
-    });
-
-    const discounts = Array.from(discountsMap.values())
-      .map((d) => ({
-        discount_id: d.discount.id,
-        code: d.discount.code,
-        name: d.discount.name,
-        times_used: d.timesUsed,
-        total_discount_amount: parseFloat(d.totalDiscountAmount.toFixed(2)),
-        total_revenue: parseFloat(d.totalRevenue.toFixed(2)),
-        average_order_value: parseFloat(
-          (d.totalRevenue / d.timesUsed).toFixed(2),
-        ),
-      }))
-      .sort((a, b) => b.times_used - a.times_used);
+    this.logger.debug(`Discount system removed - returning empty report`);
 
     return {
-      discounts,
+      discounts: [],
       start_date: start,
       end_date: end,
     };

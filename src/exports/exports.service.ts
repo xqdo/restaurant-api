@@ -137,11 +137,6 @@ export class ExportsService {
             },
           },
         },
-        receiptDiscounts: {
-          include: {
-            discount: true,
-          },
-        },
       },
       orderBy: {
         baseEntity: {
@@ -236,35 +231,6 @@ export class ExportsService {
           price: price.toFixed(2),
           subtotal: (quantity * price).toFixed(2),
           status: ri.status,
-        });
-      });
-    });
-
-    // Sheet 3: Discounts Applied
-    const discountsSheet = workbook.addWorksheet('Discounts Applied');
-    discountsSheet.columns = [
-      { header: 'Receipt #', key: 'receipt_number', width: 12 },
-      { header: 'Discount Code', key: 'code', width: 15 },
-      { header: 'Discount Name', key: 'name', width: 30 },
-      { header: 'Type', key: 'type', width: 12 },
-      { header: 'Amount', key: 'amount', width: 12 },
-    ];
-
-    discountsSheet.getRow(1).font = { bold: true };
-    discountsSheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFD3D3D3' },
-    };
-
-    receipts.forEach((receipt) => {
-      receipt.receiptDiscounts.forEach((rd) => {
-        discountsSheet.addRow({
-          receipt_number: receipt.number,
-          code: rd.discount.code,
-          name: rd.discount.name,
-          type: rd.discount.type,
-          amount: rd.discount.amount?.toString() || rd.discount.persentage?.toString() + '%' || 'N/A',
         });
       });
     });

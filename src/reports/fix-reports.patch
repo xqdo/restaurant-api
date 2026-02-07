@@ -1,0 +1,15 @@
+--- a/src/reports/reports.service.ts
++++ b/src/reports/reports.service.ts
+@@ -45,11 +45,6 @@
+         receiptItems: {
+           include: {
+             item: true,
+-            receiptItemDiscounts: true,
+-          },
+-        },
+-        receiptDiscounts: {
+-          include: {
+-            discount: true,
+           },
+         },
+       },

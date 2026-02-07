@@ -3,15 +3,22 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AssignDeliveryDto } from '../dto/assign-delivery.dto';
+import { ReceiptsService } from '../../receipts/receipts.service';
 
 @Injectable()
 export class DeliveryReceiptsService {
   private readonly logger = new Logger(DeliveryReceiptsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => ReceiptsService))
+    private readonly receiptsService: ReceiptsService,
+  ) {}
 
   /**
    * Assign receipt to delivery driver
@@ -52,28 +59,57 @@ export class DeliveryReceiptsService {
       throw new BadRequestException('Receipt already assigned to a driver');
     }
 
-    // Create delivery assignment
-    const deliveryReceipt = await this.prisma.deliveryReceipt.create({
-      data: {
-        dilvery_guy_id: dto.delivery_guy_id, // Keep typo from schema
-        receipt_id: dto.receipt_id,
-        is_paid: false,
-      },
-      include: {
-        deliveryGuy: true,
-        receipt: {
-          include: {
-            receiptItems: {
-              include: { item: true },
+    // Check if receipt is already completed
+    if (receipt.completed_at) {
+      throw new BadRequestException('Receipt is already completed');
+    }
+
+    // Calculate receipt total to track as debt
+    const totals = await this.receiptsService.calculateTotal(dto.receipt_id);
+
+    // Create delivery assignment and mark receipt as completed in a transaction
+    const deliveryReceipt = await this.prisma.$transaction(async (tx) => {
+      // Create delivery assignment
+      const newDeliveryReceipt = await tx.deliveryReceipt.create({
+        data: {
+          dilvery_guy_id: dto.delivery_guy_id, // Keep typo from schema
+          receipt_id: dto.receipt_id,
+          is_paid: false,
+        },
+        include: {
+          deliveryGuy: true,
+          receipt: {
+            include: {
+              receiptItems: {
+                include: { item: true },
+              },
             },
           },
         },
-      },
+      });
+
+      // Mark receipt as completed (order is done)
+      await tx.receipt.update({
+        where: { id: dto.receipt_id },
+        data: {
+          completed_at: new Date(),
+        },
+      });
+
+      return newDeliveryReceipt;
     });
 
-    this.logger.log(`Delivery assigned: Receipt ${dto.receipt_id} to Driver ${dto.delivery_guy_id}`);
+    this.logger.log(
+      `Delivery assigned: Receipt ${dto.receipt_id} to Driver ${dto.delivery_guy_id}. ` +
+      `Receipt total: ${totals.total} (debt on driver account). Order marked as completed.`,
+    );
 
-    return deliveryReceipt;
+    return {
+      ...deliveryReceipt,
+      receipt_total: totals.total,
+      receipt_subtotal: totals.subtotal,
+      receipt_discount: totals.discount,
+    };
   }
 
   /**
@@ -103,7 +139,7 @@ export class DeliveryReceiptsService {
   }
 
   /**
-   * Get all delivery receipts
+   * Get all delivery receipts with calculated totals (debts)
    */
   async findAll(filters?: { driver_id?: number; is_paid?: boolean }) {
     const where: any = {};
@@ -116,7 +152,7 @@ export class DeliveryReceiptsService {
       where.is_paid = filters.is_paid;
     }
 
-    return this.prisma.deliveryReceipt.findMany({
+    const deliveryReceipts = await this.prisma.deliveryReceipt.findMany({
       where,
       include: {
         deliveryGuy: true,
@@ -130,10 +166,25 @@ export class DeliveryReceiptsService {
       },
       orderBy: { id: 'desc' },
     });
+
+    // Calculate totals for each receipt to show debt amounts
+    const receiptsWithTotals = await Promise.all(
+      deliveryReceipts.map(async (dr) => {
+        const totals = await this.receiptsService.calculateTotal(dr.receipt_id);
+        return {
+          ...dr,
+          receipt_total: totals.total,
+          receipt_subtotal: totals.subtotal,
+          receipt_discount: totals.discount,
+        };
+      }),
+    );
+
+    return receiptsWithTotals;
   }
 
   /**
-   * Get delivery receipt by ID
+   * Get delivery receipt by ID with calculated total (debt)
    */
   async findOne(id: number) {
     const deliveryReceipt = await this.prisma.deliveryReceipt.findUnique({
@@ -161,14 +212,24 @@ export class DeliveryReceiptsService {
       throw new NotFoundException('Delivery receipt not found');
     }
 
-    return deliveryReceipt;
+    // Calculate receipt total
+    const totals = await this.receiptsService.calculateTotal(
+      deliveryReceipt.receipt_id,
+    );
+
+    return {
+      ...deliveryReceipt,
+      receipt_total: totals.total,
+      receipt_subtotal: totals.subtotal,
+      receipt_discount: totals.discount,
+    };
   }
 
   /**
-   * Get unpaid deliveries for a driver
+   * Get unpaid deliveries for a driver (their current debt)
    */
   async getUnpaidDeliveries(driverId: number) {
-    return this.prisma.deliveryReceipt.findMany({
+    const unpaidDeliveries = await this.prisma.deliveryReceipt.findMany({
       where: {
         dilvery_guy_id: driverId,
         is_paid: false,
@@ -183,5 +244,29 @@ export class DeliveryReceiptsService {
         },
       },
     });
+
+    // Calculate total debt
+    const deliveriesWithTotals = await Promise.all(
+      unpaidDeliveries.map(async (dr) => {
+        const totals = await this.receiptsService.calculateTotal(dr.receipt_id);
+        return {
+          ...dr,
+          receipt_total: totals.total,
+          receipt_subtotal: totals.subtotal,
+          receipt_discount: totals.discount,
+        };
+      }),
+    );
+
+    const totalDebt = deliveriesWithTotals.reduce(
+      (sum, dr) => sum + dr.receipt_total,
+      0,
+    );
+
+    return {
+      deliveries: deliveriesWithTotals,
+      total_debt: totalDebt,
+      count: deliveriesWithTotals.length,
+    };
   }
 }

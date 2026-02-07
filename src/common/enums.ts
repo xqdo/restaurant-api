@@ -9,17 +9,6 @@ export enum StatusEnum {
   done = 'done',
 }
 
-export enum DiscountTypeEnum {
-  amount = 'amount',
-  percentage = 'percentage',
-  combo = 'combo',
-}
-
-export enum ConditionTypeEnum {
-  min_amount = 'min_amount',
-  day_of_week = 'day_of_week',
-}
-
 export enum TableStatus {
   AVAILABLE = 'AVAILABLE',
   OCCUPIED = 'OCCUPIED',

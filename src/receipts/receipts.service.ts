@@ -9,6 +9,7 @@ import { BaseEntityService } from '../common/base-entity/base-entity.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { FilterReceiptsDto } from './dto/filter-receipts.dto';
 import { CompleteReceiptDto } from './dto/complete-receipt.dto';
+import { CustomerDto } from './dto/customer-list.dto';
 import { StatusEnum } from '../common/enums';
 
 @Injectable()
@@ -203,11 +204,6 @@ export class ReceiptsService {
             id: 'asc',
           },
         },
-        receiptDiscounts: {
-          include: {
-            discount: true,
-          },
-        },
       },
     });
 
@@ -217,8 +213,21 @@ export class ReceiptsService {
 
     const totals = await this.calculateTotal(id);
 
+    // Calculate subtotal for each receipt item
+    const receiptItemsWithSubtotals = receipt.receiptItems.map((item) => {
+      const price = item.unit_price ? Number(item.unit_price) : Number(item.item.price);
+      const quantity = Number(item.quantity);
+      const subtotal = price * quantity;
+
+      return {
+        ...item,
+        subtotal: subtotal.toFixed(2),
+      };
+    });
+
     return {
       ...receipt,
+      receiptItems: receiptItemsWithSubtotals,
       ...totals,
     };
   }
@@ -307,7 +316,7 @@ export class ReceiptsService {
   /**
    * Calculate receipt total
    * Subtotal = sum(item.price * quantity)
-   * Discount = sum of all discounts + quick_discount
+   * Discount = quick_discount only
    * Total = subtotal - discount
    */
   async calculateTotal(receiptId: number, tx?: any) {
@@ -332,33 +341,71 @@ export class ReceiptsService {
       return sum + price * Number(ri.quantity);
     }, 0);
 
-    // Get discounts from discount system
-    const receiptItemDiscounts = await prisma.receiptItemDiscount.findMany({
+    // Get quick discount
+    const discount = receipt?.quick_discount ? Number(receipt.quick_discount) : 0;
+
+    return {
+      subtotal: Number(subtotal.toFixed(2)),
+      discount: Number(discount.toFixed(2)),
+      total: Number((subtotal - discount).toFixed(2)),
+    };
+  }
+
+  /**
+   * Get unique delivery customers aggregated from receipts
+   * Returns customers ordered by most recent order date
+   */
+  async getDeliveryCustomers(): Promise<CustomerDto[]> {
+    this.logger.debug('Fetching delivery customers');
+
+    // Get all delivery receipts with customer info
+    const receipts = await this.prisma.receipt.findMany({
       where: {
-        receiptItem: {
-          receipt_id: receiptId,
+        is_delivery: true,
+        customer_name: { not: null },
+        phone_number: { not: null },
+        baseEntity: { isdeleted: false },
+      },
+      include: {
+        baseEntity: true,
+      },
+      orderBy: {
+        baseEntity: {
+          created_at: 'desc',
         },
       },
     });
 
-    const systemDiscount =
-      receiptItemDiscounts.reduce(
-        (sum, rid) => sum + Number(rid.applied_amount),
-        0,
-      ) || 0;
+    // Group by customer name and phone number
+    const customerMap = new Map<string, CustomerDto>();
 
-    // Get quick discount
-    const quickDiscount = receipt?.quick_discount ? Number(receipt.quick_discount) : 0;
+    receipts.forEach((receipt) => {
+      const key = `${receipt.customer_name}|${receipt.phone_number}`;
 
-    // Total discount = system discounts + quick discount
-    const totalDiscount = systemDiscount + quickDiscount;
+      if (customerMap.has(key)) {
+        const existing = customerMap.get(key)!;
+        existing.order_count += 1;
 
-    return {
-      subtotal: Number(subtotal.toFixed(2)),
-      total_discount: Number(totalDiscount.toFixed(2)),
-      quick_discount: Number(quickDiscount.toFixed(2)),
-      total: Number((subtotal - totalDiscount).toFixed(2)),
-    };
+        // Update last order date if this one is more recent
+        const existingDate = new Date(existing.last_order_date);
+        const currentDate = new Date(receipt.baseEntity.created_at);
+        if (currentDate > existingDate) {
+          existing.last_order_date = receipt.baseEntity.created_at.toISOString();
+        }
+      } else {
+        customerMap.set(key, {
+          customer_name: receipt.customer_name!,
+          phone_number: receipt.phone_number!,
+          last_order_date: receipt.baseEntity.created_at.toISOString(),
+          order_count: 1,
+        });
+      }
+    });
+
+    // Convert to array and sort by last order date
+    return Array.from(customerMap.values()).sort(
+      (a, b) => new Date(b.last_order_date).getTime() - new Date(a.last_order_date).getTime()
+    );
   }
 
   /**
@@ -413,8 +460,7 @@ export class ReceiptsService {
       receipt_id: id,
       receipt_number: receipt.number,
       subtotal: totals.subtotal,
-      quick_discount: totals.quick_discount,
-      total_discount: totals.total_discount,
+      discount: totals.discount,
       total: totals.total,
     };
   }

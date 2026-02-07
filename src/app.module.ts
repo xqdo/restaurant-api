@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -8,12 +9,12 @@ import { MenuModule } from './menu/menu.module';
 import { TablesModule } from './tables/tables.module';
 import { ReceiptsModule } from './receipts/receipts.module';
 import { KitchenModule } from './kitchen/kitchen.module';
-import { DiscountsModule } from './discounts/discounts.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { ReportsModule } from './reports/reports.module';
 import { AuditModule } from './audit/audit.module';
 import { ExportsModule } from './exports/exports.module';
 import { StorageModule } from './storage/storage.module';
+import { AuditInterceptor } from './audit/interceptors/audit.interceptor';
 
 @Module({
   imports: [
@@ -24,7 +25,6 @@ import { StorageModule } from './storage/storage.module';
     TablesModule,
     ReceiptsModule,
     KitchenModule,
-    DiscountsModule,
     DeliveryModule,
     ReportsModule,
     AuditModule,
@@ -32,6 +32,12 @@ import { StorageModule } from './storage/storage.module';
     StorageModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
+    },
+  ],
 })
 export class AppModule {}

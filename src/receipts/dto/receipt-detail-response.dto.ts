@@ -37,23 +37,6 @@ export class TableInfoDto {
   status: string;
 }
 
-export class AppliedDiscountDto {
-  @ApiProperty({ example: 1 })
-  discount_id: number;
-
-  @ApiProperty({ example: 'SUMMER20' })
-  code: string;
-
-  @ApiProperty({ example: 'Summer Sale - 20% Off' })
-  name: string;
-
-  @ApiProperty({ example: 17.99 })
-  discount_amount: number;
-
-  @ApiProperty({ example: 'percentage' })
-  type: string;
-}
-
 export class ReceiptDetailResponseDto {
   @ApiProperty({ example: 125 })
   id: number;
@@ -79,21 +62,14 @@ export class ReceiptDetailResponseDto {
   })
   items: ReceiptItemDetailDto[];
 
-  @ApiProperty({ example: 89.50, description: 'Subtotal before discounts' })
+  @ApiProperty({ example: 89.50, description: 'Subtotal before discount' })
   subtotal: number;
 
-  @ApiProperty({ example: 13.43, description: 'Total discount amount' })
-  discount_amount: number;
+  @ApiProperty({ example: 10.00, description: 'Manual discount applied at checkout' })
+  discount: number;
 
-  @ApiProperty({ example: 76.07, description: 'Final total after discounts' })
+  @ApiProperty({ example: 79.50, description: 'Final total after discount' })
   total: number;
-
-  @ApiProperty({
-    type: [AppliedDiscountDto],
-    description: 'Applied discounts',
-    required: false,
-  })
-  applied_discounts?: AppliedDiscountDto[];
 
   @ApiPropertyOptional({ example: 'Customer allergic to peanuts' })
   notes?: string;

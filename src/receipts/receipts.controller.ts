@@ -99,6 +99,20 @@ export class ReceiptsController {
     return this.receiptsService.create(dto, user.id);
   }
 
+  @ApiOperation({
+    summary: 'Get delivery customers',
+    description: 'Get list of unique customers from delivery orders, sorted by most recent order',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of delivery customers',
+  })
+  @Roles('Waiter', 'Manager', 'Admin')
+  @Get('customers')
+  getCustomers() {
+    return this.receiptsService.getDeliveryCustomers();
+  }
+
   @ApiOperation({ summary: 'List all receipts with optional filters' })
   @ApiResponse({
     status: 200,
