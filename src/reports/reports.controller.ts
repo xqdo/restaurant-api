@@ -19,6 +19,13 @@ import { DiscountUsageReportDto } from './dto/discount-usage-report.dto';
 import { StaffPerformanceReportDto } from './dto/staff-performance-report.dto';
 import { TableTurnoverReportDto } from './dto/table-turnover-report.dto';
 import { RevenueBySectionReportDto } from './dto/revenue-by-section-report.dto';
+import {
+  InventoryStatusReportDto,
+  StockMovementReportDto,
+  PurchaseCostReportDto,
+  WasteReportDto,
+  VendorPerformanceReportDto,
+} from './dto/inventory-report.dto';
 import { DateRangeDto } from './dto/date-range.dto';
 
 @ApiTags('analytics')
@@ -177,5 +184,75 @@ export class ReportsController {
   ): Promise<DiscountUsageReportDto> {
     this.logger.log(`GET /reports/discounts/usage - ${JSON.stringify(dto)}`);
     return this.reportsService.getDiscountUsage(dto);
+  }
+
+  // --- Inventory & Vendor Reports ---
+
+  @Get('inventory/status')
+  @ApiOperation({ summary: 'Get current inventory status (snapshot)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventory status report',
+    type: InventoryStatusReportDto,
+  })
+  async getInventoryStatus(): Promise<InventoryStatusReportDto> {
+    this.logger.log('GET /reports/inventory/status');
+    return this.reportsService.getInventoryStatus();
+  }
+
+  @Get('inventory/movement')
+  @ApiOperation({ summary: 'Get stock movement report (entries & usages)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Stock movement report',
+    type: StockMovementReportDto,
+  })
+  async getStockMovement(
+    @Query() dto: DateRangeDto,
+  ): Promise<StockMovementReportDto> {
+    this.logger.log(`GET /reports/inventory/movement - ${JSON.stringify(dto)}`);
+    return this.reportsService.getStockMovement(dto);
+  }
+
+  @Get('inventory/purchases')
+  @ApiOperation({ summary: 'Get purchase cost report' })
+  @ApiResponse({
+    status: 200,
+    description: 'Purchase cost report',
+    type: PurchaseCostReportDto,
+  })
+  async getPurchaseCost(
+    @Query() dto: DateRangeDto,
+  ): Promise<PurchaseCostReportDto> {
+    this.logger.log(`GET /reports/inventory/purchases - ${JSON.stringify(dto)}`);
+    return this.reportsService.getPurchaseCost(dto);
+  }
+
+  @Get('inventory/waste')
+  @ApiOperation({ summary: 'Get waste and expired items report' })
+  @ApiResponse({
+    status: 200,
+    description: 'Waste report',
+    type: WasteReportDto,
+  })
+  async getWasteReport(
+    @Query() dto: DateRangeDto,
+  ): Promise<WasteReportDto> {
+    this.logger.log(`GET /reports/inventory/waste - ${JSON.stringify(dto)}`);
+    return this.reportsService.getWasteReport(dto);
+  }
+
+  @Get('vendors/performance')
+  @ApiOperation({ summary: 'Get vendor performance report' })
+  @ApiResponse({
+    status: 200,
+    description: 'Vendor performance report',
+    type: VendorPerformanceReportDto,
+  })
+  async getVendorPerformance(
+    @Query() dto: DateRangeDto,
+  ): Promise<VendorPerformanceReportDto> {
+    this.logger.log(`GET /reports/vendors/performance - ${JSON.stringify(dto)}`);
+    return this.reportsService.getVendorPerformance(dto);
   }
 }

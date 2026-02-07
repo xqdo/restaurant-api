@@ -10,6 +10,13 @@ import { DiscountUsageReportDto } from './dto/discount-usage-report.dto';
 import { StaffPerformanceReportDto } from './dto/staff-performance-report.dto';
 import { TableTurnoverReportDto } from './dto/table-turnover-report.dto';
 import { RevenueBySectionReportDto } from './dto/revenue-by-section-report.dto';
+import {
+  InventoryStatusReportDto,
+  StockMovementReportDto,
+  PurchaseCostReportDto,
+  WasteReportDto,
+  VendorPerformanceReportDto,
+} from './dto/inventory-report.dto';
 import { DateRangeDto } from './dto/date-range.dto';
 
 @Injectable()
@@ -531,6 +538,440 @@ export class ReportsService {
 
     return {
       discounts: [],
+      start_date: start,
+      end_date: end,
+    };
+  }
+
+  /**
+   * Get current inventory status (snapshot, no date range)
+   */
+  async getInventoryStatus(): Promise<InventoryStatusReportDto> {
+    this.logger.debug('Generating inventory status report');
+
+    const storageItems = await this.prisma.storageItem.findMany({
+      where: {
+        baseEntity: { isdeleted: false },
+      },
+      include: {
+        vendor: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+
+    const items = storageItems.map((item) => {
+      const currentQty = parseFloat(item.current_quantity.toString());
+      const minQty = item.min_quantity
+        ? parseFloat(item.min_quantity.toString())
+        : null;
+
+      let status: 'ok' | 'low' | 'out';
+      if (currentQty === 0) {
+        status = 'out';
+        outOfStockCount++;
+      } else if (minQty !== null && currentQty < minQty) {
+        status = 'low';
+        lowStockCount++;
+      } else {
+        status = 'ok';
+      }
+
+      return {
+        item_id: item.id,
+        name: item.name,
+        unit: item.unit,
+        current_quantity: currentQty,
+        min_quantity: minQty,
+        status,
+        vendor_name: item.vendor?.name || null,
+      };
+    });
+
+    return {
+      items,
+      total_items: items.length,
+      low_stock_count: lowStockCount,
+      out_of_stock_count: outOfStockCount,
+    };
+  }
+
+  /**
+   * Get stock movement report (entries and usages in date range)
+   */
+  async getStockMovement(dto: DateRangeDto): Promise<StockMovementReportDto> {
+    const { start, end } = this.calculateDateRange(dto);
+
+    this.logger.debug(`Generating stock movement report from ${start} to ${end}`);
+
+    const startDate = new Date(start);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(end);
+    endDate.setHours(23, 59, 59, 999);
+
+    const [entries, usages] = await Promise.all([
+      this.prisma.storageEntry.findMany({
+        where: {
+          entry_date: { gte: startDate, lte: endDate },
+          baseEntity: { isdeleted: false },
+        },
+        include: { storageItem: true },
+      }),
+      this.prisma.storageUsage.findMany({
+        where: {
+          usage_date: { gte: startDate, lte: endDate },
+          baseEntity: { isdeleted: false },
+        },
+        include: { storageItem: true },
+      }),
+    ]);
+
+    const itemsMap = new Map<
+      number,
+      {
+        name: string;
+        unit: string;
+        entriesQty: number;
+        entriesCount: number;
+        usagesQty: number;
+        usagesCount: number;
+      }
+    >();
+
+    entries.forEach((e) => {
+      const qty = parseFloat(e.quantity.toString());
+      const existing = itemsMap.get(e.storage_item_id);
+      if (existing) {
+        existing.entriesQty += qty;
+        existing.entriesCount++;
+      } else {
+        itemsMap.set(e.storage_item_id, {
+          name: e.storageItem.name,
+          unit: e.storageItem.unit,
+          entriesQty: qty,
+          entriesCount: 1,
+          usagesQty: 0,
+          usagesCount: 0,
+        });
+      }
+    });
+
+    usages.forEach((u) => {
+      const qty = parseFloat(u.quantity.toString());
+      const existing = itemsMap.get(u.storage_item_id);
+      if (existing) {
+        existing.usagesQty += qty;
+        existing.usagesCount++;
+      } else {
+        itemsMap.set(u.storage_item_id, {
+          name: u.storageItem.name,
+          unit: u.storageItem.unit,
+          entriesQty: 0,
+          entriesCount: 0,
+          usagesQty: qty,
+          usagesCount: 1,
+        });
+      }
+    });
+
+    let totalReceived = 0;
+    let totalConsumed = 0;
+
+    const items = Array.from(itemsMap.entries())
+      .map(([itemId, data]) => {
+        const netChange = parseFloat(
+          (data.entriesQty - data.usagesQty).toFixed(2),
+        );
+        totalReceived += data.entriesQty;
+        totalConsumed += data.usagesQty;
+
+        return {
+          item_id: itemId,
+          name: data.name,
+          unit: data.unit,
+          total_entries_qty: parseFloat(data.entriesQty.toFixed(2)),
+          entries_count: data.entriesCount,
+          total_usages_qty: parseFloat(data.usagesQty.toFixed(2)),
+          usages_count: data.usagesCount,
+          net_change: netChange,
+        };
+      })
+      .sort((a, b) => Math.abs(b.net_change) - Math.abs(a.net_change));
+
+    return {
+      items,
+      total_received: parseFloat(totalReceived.toFixed(2)),
+      total_consumed: parseFloat(totalConsumed.toFixed(2)),
+      start_date: start,
+      end_date: end,
+    };
+  }
+
+  /**
+   * Get purchase cost report (entries cost aggregation)
+   */
+  async getPurchaseCost(dto: DateRangeDto): Promise<PurchaseCostReportDto> {
+    const { start, end } = this.calculateDateRange(dto);
+
+    this.logger.debug(`Generating purchase cost report from ${start} to ${end}`);
+
+    const startDate = new Date(start);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(end);
+    endDate.setHours(23, 59, 59, 999);
+
+    const entries = await this.prisma.storageEntry.findMany({
+      where: {
+        entry_date: { gte: startDate, lte: endDate },
+        baseEntity: { isdeleted: false },
+      },
+      include: { storageItem: true },
+    });
+
+    const itemsMap = new Map<
+      number,
+      {
+        name: string;
+        unit: string;
+        totalQty: number;
+        totalCost: number;
+        count: number;
+      }
+    >();
+
+    entries.forEach((e) => {
+      const qty = parseFloat(e.quantity.toString());
+      const unitPrice = e.unit_price
+        ? parseFloat(e.unit_price.toString())
+        : 0;
+      const cost = qty * unitPrice;
+
+      const existing = itemsMap.get(e.storage_item_id);
+      if (existing) {
+        existing.totalQty += qty;
+        existing.totalCost += cost;
+        existing.count++;
+      } else {
+        itemsMap.set(e.storage_item_id, {
+          name: e.storageItem.name,
+          unit: e.storageItem.unit,
+          totalQty: qty,
+          totalCost: cost,
+          count: 1,
+        });
+      }
+    });
+
+    let grandTotal = 0;
+
+    const items = Array.from(itemsMap.entries())
+      .map(([itemId, data]) => {
+        grandTotal += data.totalCost;
+        const avgCost =
+          data.totalQty > 0 ? data.totalCost / data.totalQty : 0;
+
+        return {
+          item_id: itemId,
+          name: data.name,
+          unit: data.unit,
+          total_quantity: parseFloat(data.totalQty.toFixed(2)),
+          total_cost: parseFloat(data.totalCost.toFixed(2)),
+          average_unit_cost: parseFloat(avgCost.toFixed(2)),
+          entries_count: data.count,
+        };
+      })
+      .sort((a, b) => b.total_cost - a.total_cost);
+
+    return {
+      items,
+      grand_total: parseFloat(grandTotal.toFixed(2)),
+      start_date: start,
+      end_date: end,
+    };
+  }
+
+  /**
+   * Get waste and expired report
+   */
+  async getWasteReport(dto: DateRangeDto): Promise<WasteReportDto> {
+    const { start, end } = this.calculateDateRange(dto);
+
+    this.logger.debug(`Generating waste report from ${start} to ${end}`);
+
+    const startDate = new Date(start);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(end);
+    endDate.setHours(23, 59, 59, 999);
+
+    const usages = await this.prisma.storageUsage.findMany({
+      where: {
+        usage_date: { gte: startDate, lte: endDate },
+        reason: { in: ['waste', 'expired'] },
+        baseEntity: { isdeleted: false },
+      },
+      include: { storageItem: true },
+    });
+
+    const itemsMap = new Map<
+      number,
+      {
+        name: string;
+        unit: string;
+        wasteQty: number;
+        wasteCount: number;
+        expiredQty: number;
+        expiredCount: number;
+      }
+    >();
+
+    usages.forEach((u) => {
+      const qty = parseFloat(u.quantity.toString());
+      const existing = itemsMap.get(u.storage_item_id);
+
+      if (existing) {
+        if (u.reason === 'waste') {
+          existing.wasteQty += qty;
+          existing.wasteCount++;
+        } else {
+          existing.expiredQty += qty;
+          existing.expiredCount++;
+        }
+      } else {
+        itemsMap.set(u.storage_item_id, {
+          name: u.storageItem.name,
+          unit: u.storageItem.unit,
+          wasteQty: u.reason === 'waste' ? qty : 0,
+          wasteCount: u.reason === 'waste' ? 1 : 0,
+          expiredQty: u.reason === 'expired' ? qty : 0,
+          expiredCount: u.reason === 'expired' ? 1 : 0,
+        });
+      }
+    });
+
+    let totalWasteQty = 0;
+    let totalExpiredQty = 0;
+
+    const items = Array.from(itemsMap.entries())
+      .map(([itemId, data]) => {
+        const totalLoss = data.wasteQty + data.expiredQty;
+        totalWasteQty += data.wasteQty;
+        totalExpiredQty += data.expiredQty;
+
+        return {
+          item_id: itemId,
+          name: data.name,
+          unit: data.unit,
+          waste_qty: parseFloat(data.wasteQty.toFixed(2)),
+          waste_count: data.wasteCount,
+          expired_qty: parseFloat(data.expiredQty.toFixed(2)),
+          expired_count: data.expiredCount,
+          total_loss: parseFloat(totalLoss.toFixed(2)),
+        };
+      })
+      .sort((a, b) => b.total_loss - a.total_loss);
+
+    return {
+      items,
+      total_waste_qty: parseFloat(totalWasteQty.toFixed(2)),
+      total_expired_qty: parseFloat(totalExpiredQty.toFixed(2)),
+      total_loss: parseFloat((totalWasteQty + totalExpiredQty).toFixed(2)),
+      start_date: start,
+      end_date: end,
+    };
+  }
+
+  /**
+   * Get vendor performance report
+   */
+  async getVendorPerformance(
+    dto: DateRangeDto,
+  ): Promise<VendorPerformanceReportDto> {
+    const { start, end } = this.calculateDateRange(dto);
+
+    this.logger.debug(`Generating vendor performance report from ${start} to ${end}`);
+
+    const startDate = new Date(start);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(end);
+    endDate.setHours(23, 59, 59, 999);
+
+    const entries = await this.prisma.storageEntry.findMany({
+      where: {
+        vendor_id: { not: null },
+        entry_date: { gte: startDate, lte: endDate },
+        baseEntity: { isdeleted: false },
+      },
+      include: {
+        vendor: true,
+        storageItem: true,
+      },
+    });
+
+    const vendorsMap = new Map<
+      number,
+      {
+        name: string;
+        phone: string | null;
+        totalQty: number;
+        totalCost: number;
+        uniqueItems: Set<number>;
+        count: number;
+      }
+    >();
+
+    entries.forEach((e) => {
+      if (!e.vendor_id || !e.vendor) return;
+
+      const qty = parseFloat(e.quantity.toString());
+      const unitPrice = e.unit_price
+        ? parseFloat(e.unit_price.toString())
+        : 0;
+      const cost = qty * unitPrice;
+
+      const existing = vendorsMap.get(e.vendor_id);
+      if (existing) {
+        existing.totalQty += qty;
+        existing.totalCost += cost;
+        existing.uniqueItems.add(e.storage_item_id);
+        existing.count++;
+      } else {
+        vendorsMap.set(e.vendor_id, {
+          name: e.vendor.name,
+          phone: e.vendor.phone,
+          totalQty: qty,
+          totalCost: cost,
+          uniqueItems: new Set([e.storage_item_id]),
+          count: 1,
+        });
+      }
+    });
+
+    let grandTotal = 0;
+
+    const vendors = Array.from(vendorsMap.entries())
+      .map(([vendorId, data]) => {
+        grandTotal += data.totalCost;
+        const avgCostPerEntry =
+          data.count > 0 ? data.totalCost / data.count : 0;
+
+        return {
+          vendor_id: vendorId,
+          name: data.name,
+          phone: data.phone,
+          total_quantity: parseFloat(data.totalQty.toFixed(2)),
+          total_cost: parseFloat(data.totalCost.toFixed(2)),
+          unique_items_count: data.uniqueItems.size,
+          entries_count: data.count,
+          average_cost_per_entry: parseFloat(avgCostPerEntry.toFixed(2)),
+        };
+      })
+      .sort((a, b) => b.total_cost - a.total_cost);
+
+    return {
+      vendors,
+      grand_total: parseFloat(grandTotal.toFixed(2)),
       start_date: start,
       end_date: end,
     };
