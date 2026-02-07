@@ -46,6 +46,7 @@ export class StorageItemsService {
       where,
       include: {
         baseEntity: true,
+        vendor: true,
       },
       orderBy: {
         name: 'asc',
@@ -73,6 +74,7 @@ export class StorageItemsService {
       where: { id },
       include: {
         baseEntity: true,
+        vendor: true,
         storageEntries: {
           include: { baseEntity: true },
           where: { baseEntity: { isdeleted: false } },
@@ -111,10 +113,12 @@ export class StorageItemsService {
         unit: createDto.unit,
         current_quantity: 0,
         min_quantity: createDto.min_quantity,
+        vendor_id: createDto.vendor_id,
         base_entity_id: baseEntity.id,
       },
       include: {
         baseEntity: true,
+        vendor: true,
       },
     });
   }
@@ -138,9 +142,11 @@ export class StorageItemsService {
         description: updateDto.description,
         unit: updateDto.unit,
         min_quantity: updateDto.min_quantity,
+        vendor_id: updateDto.vendor_id,
       },
       include: {
         baseEntity: true,
+        vendor: true,
       },
     });
   }
@@ -173,6 +179,7 @@ export class StorageItemsService {
       },
       include: {
         baseEntity: true,
+        vendor: true,
       },
     });
 

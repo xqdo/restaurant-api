@@ -14,6 +14,7 @@ import { ReportsModule } from './reports/reports.module';
 import { AuditModule } from './audit/audit.module';
 import { ExportsModule } from './exports/exports.module';
 import { StorageModule } from './storage/storage.module';
+import { VendorsModule } from './vendors/vendors.module';
 import { AuditInterceptor } from './audit/interceptors/audit.interceptor';
 
 @Module({
@@ -30,6 +31,7 @@ import { AuditInterceptor } from './audit/interceptors/audit.interceptor';
     AuditModule,
     ExportsModule,
     StorageModule,
+    VendorsModule,
   ],
   controllers: [AppController],
   providers: [

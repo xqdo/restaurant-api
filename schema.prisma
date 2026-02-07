@@ -39,6 +39,7 @@ model BaseEntity {
   storageEntries   StorageEntry[]
   storageUsages    StorageUsage[]
   itemPriceHistory ItemPriceHistory[]
+  vendors          Vendor[]
 
   @@map("base_entity")
 }
@@ -221,9 +222,11 @@ model StorageItem {
   unit             String    // kg, g, liter, ml, piece, pack, box
   current_quantity Decimal   @default(0)
   min_quantity     Decimal?  // Alert threshold (optional)
+  vendor_id        Int?
   base_entity_id   Int
 
   baseEntity     BaseEntity       @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vendor         Vendor?          @relation(fields: [vendor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   storageEntries StorageEntry[]
   storageUsages  StorageUsage[]
 
@@ -236,11 +239,13 @@ model StorageEntry {
   quantity        Decimal
   unit_price      Decimal?
   supplier        String?
+  vendor_id       Int?
   notes           String?
   entry_date      DateTime
   base_entity_id  Int
 
   storageItem StorageItem @relation(fields: [storage_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vendor      Vendor?     @relation(fields: [vendor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   baseEntity  BaseEntity  @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("storage_entries")
@@ -259,6 +264,23 @@ model StorageUsage {
   baseEntity  BaseEntity  @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("storage_usages")
+}
+
+// ============= VENDORS =============
+
+model Vendor {
+  id             Int     @id @default(autoincrement())
+  name           String
+  phone          String?
+  address        String?
+  notes          String?
+  base_entity_id Int
+
+  baseEntity     BaseEntity     @relation(fields: [base_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  storageItems   StorageItem[]
+  storageEntries StorageEntry[]
+
+  @@map("vendors")
 }
 
 // ============= PRICE HISTORY =============

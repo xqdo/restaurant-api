@@ -57,6 +57,7 @@ export class StorageEntriesService {
       where,
       include: {
         storageItem: true,
+        vendor: true,
         baseEntity: true,
       },
       orderBy: {
@@ -75,6 +76,7 @@ export class StorageEntriesService {
       where: { id },
       include: {
         storageItem: true,
+        vendor: true,
         baseEntity: true,
       },
     });
@@ -121,6 +123,7 @@ export class StorageEntriesService {
           quantity: createDto.quantity,
           unit_price: createDto.unit_price,
           supplier: createDto.supplier,
+          vendor_id: createDto.vendor_id,
           notes: createDto.notes,
           entry_date: createDto.entry_date ? new Date(createDto.entry_date) : new Date(),
           base_entity_id: baseEntity.id,

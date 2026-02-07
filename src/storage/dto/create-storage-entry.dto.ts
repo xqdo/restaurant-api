@@ -37,11 +37,20 @@ export class CreateStorageEntryDto {
 
   @ApiPropertyOptional({
     example: 'ABC Suppliers',
-    description: 'Supplier name',
+    description: 'Supplier name (legacy, prefer vendor_id)',
   })
   @IsString()
   @IsOptional()
   supplier?: string;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'ID of the vendor/supplier',
+  })
+  @IsInt({ message: 'Vendor ID must be an integer' })
+  @IsPositive({ message: 'Vendor ID must be a positive integer' })
+  @IsOptional()
+  vendor_id?: number;
 
   @ApiPropertyOptional({
     example: 'Weekly delivery',

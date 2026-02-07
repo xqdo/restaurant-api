@@ -5,6 +5,8 @@ import {
   MaxLength,
   IsEnum,
   IsNumber,
+  IsInt,
+  IsPositive,
   Min,
   IsOptional,
 } from 'class-validator';
@@ -44,4 +46,13 @@ export class CreateStorageItemDto {
   @Min(0, { message: 'Minimum quantity must be at least 0' })
   @IsOptional()
   min_quantity?: number;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'ID of the vendor/supplier for this item',
+  })
+  @IsInt({ message: 'Vendor ID must be an integer' })
+  @IsPositive({ message: 'Vendor ID must be a positive integer' })
+  @IsOptional()
+  vendor_id?: number;
 }
